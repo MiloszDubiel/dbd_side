@@ -1,7 +1,8 @@
 import express from "express";
 import mysql from "mysql2/promise";
 import cors from "cors";
-import { main } from "./scraper";
+import { scrapeSurvivorsAndSaveToDatabase } from "./scrapers/characters";
+import { scrapeKillersAndSaveToDatabase } from "./scrapers/killers";
 
 const app = express();
 app.use(cors());
@@ -36,7 +37,22 @@ app.get("/random-build", async (req, res) => {
 });
 
 app.get("/scrape-data", async () => {
-  await main();
+  await scrapeKillersAndSaveToDatabase();
+  await scrapeSurvivorsAndSaveToDatabase();
+});
+app.get("/scrape-killers", async () => {
+  await scrapeKillersAndSaveToDatabase();
+});
+app.get("/scrape-survivors", async () => {
+  await scrapeSurvivorsAndSaveToDatabase();
+});
+
+app.get("/get-killers", async (req, res) => {
+  const [rows] = await pool.query(
+    "SELECT * FROM characters WHERE role = 'killer'",
+  );
+
+  return res.json({ killers: rows });
 });
 
 app.listen(5000, () => {
