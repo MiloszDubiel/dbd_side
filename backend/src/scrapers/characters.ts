@@ -6,6 +6,7 @@ type Character = {
   name: string;
   role: "killer" | "survivor";
   img_url: string | undefined;
+  fullName: string | null;
 };
 
 export async function scrapeCharacters(
@@ -30,10 +31,14 @@ export async function scrapeCharacters(
 
     for (const row of rows) {
       const name = await row
-        .$eval("th:nth-child(4) a", (el) => el.getAttribute("title"))
+        .$eval("th:nth-child(4) a", (el) => el.textContent)
         .catch(() => null);
 
       if (!name) continue;
+
+      const fullName = await row
+        .$eval("th:nth-child(4) a", (el) => el.getAttribute("title"))
+        .catch(() => null);
 
       const img = await row
         .$eval("th:nth-child(4) img", (el) => el.getAttribute("src"))
@@ -42,6 +47,7 @@ export async function scrapeCharacters(
       characters.push({
         name,
         img_url: img ? `https://deadbydaylight.wiki.gg${img}` : undefined,
+        fullName,
         role: tableIndex === 0 ? "survivor" : "killer",
       });
 
@@ -62,9 +68,7 @@ export const scrapeSurvivors = async () => {
   const url = "https://deadbydaylight.wiki.gg/wiki/Perks";
 
   const survivorPerks = await scrapePerks(url, 0);
-
   const survivors = await scrapeCharacters(url, "survivor", 0);
-
   const survivorMap = await saveCharacters(survivors);
 
   const enrich = (perks: any[]) =>

@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import bgImage from "../src/assets/background/dbd_background.jpg";
-import DBDlePage from "./pages/DBDlePage";
+import KillerGuessPage from "./pages/KillerGuessPage";
 
 function App() {
   return (
@@ -20,7 +20,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/builds" element={<div>Builds</div>} />
-          <Route path="/dbdle" element={<DBDlePage />} />
+          <Route path="/dbdle" element={<KillerGuessPage />} />
           <Route path="/perks" element={<div>Perks</div>} />
         </Routes>
       </BrowserRouter>

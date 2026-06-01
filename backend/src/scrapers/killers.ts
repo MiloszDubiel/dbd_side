@@ -6,105 +6,109 @@ import pLimit from "p-limit";
 import { saveKillerDetails } from "../fetch";
 import { scrapePerks } from "./perks";
 
-export async function scrapeKillerDetails(name: string) {
+export const killerReleaseYears = {
+  2016: [
+    "The Trapper",
+    "The Wraith",
+    "The Hillbilly",
+    "The Nurse",
+    "The Shape",
+    "The Hag",
+  ],
+
+  2017: ["The Doctor", "The Huntress", "The Cannibal", "The Nightmare"],
+
+  2018: ["The Pig", "The Clown", "The Spirit", "The Legion"],
+
+  2019: ["The Plague", "The Ghost Face", "The Demogorgon", "The Oni"],
+
+  2020: ["The Deathslinger", "The Executioner", "The Blight", "The Twins"],
+
+  2021: ["The Trickster", "The Nemesis", "The Cenobite", "The Artist"],
+
+  2022: ["The Onryō", "The Dredge", "The Mastermind", "The Knight"],
+
+  2023: [
+    "The Skull Merchant",
+    "The Singularity",
+    "The Xenomorph",
+    "The Good Guy",
+  ],
+
+  2024: ["The Unknown", "The Lich", "The Dark Lord"],
+
+  2025: ["The Houndmaster", "The Ghoul"],
+};
+
+export function getKillerReleaseYear(name: string): string | null {
+  for (const [year, killers] of Object.entries(killerReleaseYears)) {
+    if (killers.includes(name)) {
+      return String(year);
+    }
+  }
+
+  return null;
+}
+
+export async function scrapeKillerDetails(
+  in_game_name: string,
+  full_name: string | null,
+) {
   const { browser, page } = await createBrowser();
 
-  const url = `https://deadbydaylight.wiki.gg/wiki/${name.replace(/\s/g, "_")}`;
+  const url = `https://deadbydaylight.wiki.gg/wiki/${in_game_name.replace(/\s/g, "_")}`;
 
   try {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.goto(url, {
+      waitUntil: "networkidle",
+      timeout: 30000,
+    });
+
+    await page.waitForSelector(".killerInfobox");
 
     const get = async (label: string) => {
-      return page
-        .$eval(
-          ".infoboxtable",
-          (table, label) => {
-            const rows = table.querySelectorAll("tr");
-            console.log(rows);
+      const tabel = (await page.$$(".killerInfobox"))[0];
 
-            for (const row of rows) {
-              const tdName = row.querySelectorAll("td")[0];
-              const tdValue = row.querySelectorAll("td")[1];
+      const rows = await tabel.$$("tr");
 
-              if (tdName?.textContent?.includes(label)) {
-                return tdValue?.textContent?.trim() || null;
-              }
-            }
+      for (const row of rows) {
+        const title = await row
+          .$eval(".titleColumn", (el) => el?.textContent?.trim())
+          .catch(() => "");
 
-            return null;
-          },
-          label,
-        )
-        .catch(() => null);
+        const value = await row
+          .$eval(".valueColumn", (el) => el?.textContent?.trim())
+          .catch(() => "");
+
+        if (title.includes(label)) {
+          return value;
+        }
+      }
     };
+
     return {
-      in_game_name: name,
+      in_game_name,
+      full_name,
       name: await get("Name"),
-      game_aliases: await get("Game Alias(es)"),
+      game_aliases: await get("Game Alias"),
       gender: await get("Gender"),
       origin: await get("Origin"),
-      power_attack_type: await get("Power Attack Type"),
+      power_attack_type: await get("Attack"),
       movement_speed: await get("Movement Speed"),
       alternative_movement_speed: await get("Alternate Movement speed"),
       terror_radius: await get("Terror Radius"),
       height: await get("Height"),
+      release_date: getKillerReleaseYear(in_game_name || ""),
     };
   } finally {
     await browser.close();
   }
 }
 
-export const updateKillerDetail = async () => {
-  const [rows] = await pool.query<any[]>(
-    "SELECT * FROM characters WHERE role='killer'",
-  );
-
-  for (const row of rows) {
-    const details = await scrapeKillerDetails(row.name);
-
-    await pool.query(
-      `
-      INSERT INTO killer_detail (
-        character_id,
-        in_game_name,
-        game_aliases,
-        gender,
-        origin,
-        movement_speed,
-        alternate_movement_speed,
-        terror_radius,
-        height
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        in_game_name = VALUES(in_game_name),
-        game_aliases = VALUES(game_aliases),
-        gender = VALUES(gender),
-        origin = VALUES(origin),
-        movement_speed = VALUES(movement_speed),
-        alternate_movement_speed = VALUES(alternate_movement_speed),
-        terror_radius = VALUES(terror_radius),
-        height = VALUES(height)
-      `,
-      [
-        row.id,
-        details.in_game_name ?? null,
-        details.game_aliases ?? null,
-        details.gender ?? null,
-        details.origin ?? null,
-        details.movement_speed ?? null,
-        details.alternative_movement_speed ?? null,
-        details.terror_radius ?? null,
-        details.height ?? null,
-      ],
-    );
-  }
-};
-
 export const scrapeKillersAndSaveToDatabase = async () => {
   const url = "https://deadbydaylight.wiki.gg/wiki/Perks";
 
-  const killerPerks = await scrapePerks(url, 1);
-
+  // const killerPerks = await scrapePerks(url, 1);
   const killers = await scrapeCharacters(url, "killer", 1);
   const killerMap = await saveCharacters(killers);
   const charMap = new Map([...killerMap]);
@@ -114,7 +118,7 @@ export const scrapeKillersAndSaveToDatabase = async () => {
     killers.map((k) =>
       limit(async () => {
         try {
-          const details = await scrapeKillerDetails(k.name);
+          const details = await scrapeKillerDetails(k.name, k.fullName);
 
           return {
             ...details,
@@ -139,5 +143,5 @@ export const scrapeKillersAndSaveToDatabase = async () => {
         : undefined,
     }));
 
-  await savePerks(enrich(killerPerks));
+  // await savePerks(enrich(killerPerks));
 };

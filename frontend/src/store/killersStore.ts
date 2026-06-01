@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import axios from "axios";
 
-export type KillersArray = {
-  killers?: any;
+export type Killers = {
   id: number;
   in_game_name: string;
   name: string;
@@ -14,9 +13,14 @@ export type KillersArray = {
   terror_radius: string;
   height: string;
   image_url: string;
+  result: any;
 };
 
-export const fetchKillers = async (): Promise<KillersArray[]> => {
+export type KillersArray = {
+  killers: Killers[];
+};
+
+export const fetchKillers = async (): Promise<KillersArray> => {
   const res = await axios.get("http://localhost:5000/get-killers");
 
   if (!res.data) throw new Error("Failed to fetch killers");
@@ -24,7 +28,7 @@ export const fetchKillers = async (): Promise<KillersArray[]> => {
   return res.data;
 };
 
-export const fetchSelectedKiller = async (): Promise<KillersArray[]> => {
+export const fetchSelectedKiller = async (): Promise<Killers[]> => {
   const res = await axios.get("http://localhost:5000/get-selected-killer");
 
   if (!res.data) throw new Error("Failed to fetch killers");
@@ -45,6 +49,5 @@ export const useUIStore = create<UIStore>((set) => ({
   search: "",
 
   setSelectedKiller: (id) => set({ selectedKillerId: id }),
-
   setSearch: (value) => set({ search: value }),
 }));

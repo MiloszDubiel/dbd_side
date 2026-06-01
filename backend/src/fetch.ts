@@ -43,16 +43,20 @@ export async function savePerks(perks: any[]) {
   }
 }
 
-type KillerDetails = {
-  character_id: number;
+export type KillerDetails = {
+  character_id?: number;
   in_game_name?: string;
   game_aliases?: string | null;
   gender?: string;
   origin?: string;
+  power_attack_type?: string;
   movement_speed?: string;
   alternative_movement_speed?: string;
   terror_radius?: string;
   height?: string;
+  release_date?: number | null;
+  name: string;
+  full_name: string;
 };
 
 export async function saveKillerDetails(details: KillerDetails[]) {
@@ -64,6 +68,8 @@ export async function saveKillerDetails(details: KillerDetails[]) {
     await conn.beginTransaction();
 
     for (const d of details) {
+      if (!d.in_game_name) continue;
+
       await conn.query(
         `
         INSERT INTO killer_detail (
@@ -72,20 +78,28 @@ export async function saveKillerDetails(details: KillerDetails[]) {
           game_aliases,
           gender,
           origin,
+          power_attack_type,
           movement_speed,
           alternate_movement_speed,
           terror_radius,
-          height
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          height,
+          release_date,
+          name,
+          full_name
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           in_game_name = VALUES(in_game_name),
           game_aliases = VALUES(game_aliases),
           gender = VALUES(gender),
+          power_attack_type = VALUES(power_attack_type),
           origin = VALUES(origin),
           movement_speed = VALUES(movement_speed),
           alternate_movement_speed = VALUES(alternate_movement_speed),
           terror_radius = VALUES(terror_radius),
-          height = VALUES(height)
+          height = VALUES(height),
+          release_date = VALUES(release_date),
+          name = VALUES(name),
+          full_name = VALUES(full_name)
         `,
         [
           d.character_id,
@@ -93,10 +107,14 @@ export async function saveKillerDetails(details: KillerDetails[]) {
           d.game_aliases ?? null,
           d.gender ?? null,
           d.origin ?? null,
+          d.power_attack_type ?? null,
           d.movement_speed ?? null,
           d.alternative_movement_speed ?? null,
           d.terror_radius ?? null,
           d.height ?? null,
+          d.release_date ?? null,
+          d.name,
+          d.full_name,
         ],
       );
     }
