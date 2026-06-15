@@ -19,7 +19,7 @@ export async function scrapeCharacters(
   const characters: Character[] = [];
 
   try {
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.goto(url, { waitUntil: "load" });
 
     const tables = await page.$$(
       ".wikitable.overflowScroll.sortable.jquery-tablesorter",

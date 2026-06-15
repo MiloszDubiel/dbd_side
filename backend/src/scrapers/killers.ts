@@ -5,6 +5,7 @@ import { saveCharacters, savePerks } from "../fetch";
 import pLimit from "p-limit";
 import { saveKillerDetails } from "../fetch";
 import { scrapePerks } from "./perks";
+import { join } from "node:path";
 
 export const killerReleaseYears = {
   2016: [
@@ -35,28 +36,93 @@ export const killerReleaseYears = {
     "The Good Guy",
   ],
 
-  2024: ["The Unknown", "The Lich", "The Dark Lord"],
+  2024: ["The Unknown", "The Lich", "The Dark Lord", "The Houndmaster"],
 
-  2025: ["The Houndmaster", "The Ghoul"],
+  2025: ["The Ghoul", "The Krasue", "The Animatronic"],
+  2026: ["The First", "The Slasher"],
+};
+
+export const RANGED = [
+  "The Huntress",
+  "The Trickster",
+  "The Deathslinger",
+  "The Artist",
+  "The First",
+  "The Slasher",
+];
+
+export const HYBRID = [
+  "The Nurse",
+  "The Blight",
+  "The Oni",
+  "The Hillbilly",
+  "The Cannibal",
+  "The Shape",
+  "The Demogorgon",
+  "The Executioner",
+  "The Singularity",
+  "The Xenomorph",
+  "The Mastermind",
+  "The Lich",
+  "The Krasue",
+];
+
+export const getKillerAttackType = (name: string): string => {
+  for (const range of RANGED) {
+    if (range.toLocaleLowerCase().includes(name.toLocaleLowerCase()))
+      return "Ranged";
+  }
+
+  for (const hybrid of HYBRID) {
+    if (hybrid.toLocaleLowerCase().includes(name.toLocaleLowerCase()))
+      return "Hybrid";
+  }
+
+  return "Basic Attack";
 };
 
 export function getKillerReleaseYear(name: string): string | null {
   for (const [year, killers] of Object.entries(killerReleaseYears)) {
-    if (killers.includes(name)) {
-      return String(year);
+    for (const killer of killers) {
+      if (killer.toLocaleLowerCase().includes(name.toLocaleLowerCase())) {
+        return String(year);
+      }
+    }
+  }
+  return null;
+}
+const retry = async <T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 1000,
+): Promise<T> => {
+  let lastError;
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+
+      console.log(
+        `Próba ${i + 1}/${retries} nieudana. Ponawiam za ${delay}ms...`,
+      );
+
+      if (i < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
   }
 
-  return null;
-}
-
+  throw lastError;
+};
 export async function scrapeKillerDetails(
   in_game_name: string,
   full_name: string | null,
 ) {
   const { browser, page } = await createBrowser();
 
-  const url = `https://deadbydaylight.wiki.gg/wiki/${in_game_name.replace(/\s/g, "_")}`;
+  const url = `https://deadbydaylight.wiki.gg/wiki/The_${in_game_name.replace(/\s/g, "_")}`;
 
   try {
     await page.goto(url, {
@@ -76,15 +142,38 @@ export async function scrapeKillerDetails(
           .$eval(".titleColumn", (el) => el?.textContent?.trim())
           .catch(() => "");
 
-        const value = await row
+        let value = await row
           .$eval(".valueColumn", (el) => el?.textContent?.trim())
           .catch(() => "");
+
+        if (label === "Attack") value = value?.split("\n")[0].trim();
+
+        if (label === "Movement Speed") {
+          const mainMatch = value?.match(/\d+(?:\.\d+)?/g) || [];
+
+          value = mainMatch?.map((v) => `${v}m/s`).join(" ");
+        }
+        if (label === "Origin") value = value.split("(")[0];
+
+        if (label === "Terror Radius") {
+          const matches = value?.match(/\d+(?:\.\d+)?/g) || [];
+
+          value = matches.map((v) => `${v}m`).join(" ");
+        }
+
+        if (label === "Alternate Movement speed") {
+          const matches = value?.match(/\d+(?:\.\d+)?/g) || [];
+
+          value = matches.map((v) => `${v}m/s`).join(" ");
+        }
 
         if (title.includes(label)) {
           return value;
         }
       }
     };
+
+    console.log(in_game_name);
 
     return {
       in_game_name,
@@ -93,7 +182,7 @@ export async function scrapeKillerDetails(
       game_aliases: await get("Game Alias"),
       gender: await get("Gender"),
       origin: await get("Origin"),
-      power_attack_type: await get("Attack"),
+      power_attack_type: getKillerAttackType(in_game_name),
       movement_speed: await get("Movement Speed"),
       alternative_movement_speed: await get("Alternate Movement speed"),
       terror_radius: await get("Terror Radius"),
@@ -108,24 +197,30 @@ export async function scrapeKillerDetails(
 export const scrapeKillersAndSaveToDatabase = async () => {
   const url = "https://deadbydaylight.wiki.gg/wiki/Perks";
 
-  // const killerPerks = await scrapePerks(url, 1);
+  const killerPerks = await scrapePerks(url, 1);
   const killers = await scrapeCharacters(url, "killer", 1);
   const killerMap = await saveCharacters(killers);
   const charMap = new Map([...killerMap]);
 
   const limit = pLimit(5);
+
+  const uniqueKillers = [...new Map(killers.map((k) => [k.name, k])).values()];
   const killerDetails = await Promise.all(
-    killers.map((k) =>
+    uniqueKillers.map((k) =>
       limit(async () => {
         try {
-          const details = await scrapeKillerDetails(k.name, k.fullName);
+          const details = await retry(
+            () => scrapeKillerDetails(k.name, k.fullName),
+            5,
+            2000,
+          );
 
           return {
             ...details,
             character_id: charMap.get(k.name),
           };
         } catch (err) {
-          console.error("Błąd dla:", k.name);
+          console.error("Błąd dla:", k.name, err);
           return null;
         }
       }),
@@ -143,5 +238,5 @@ export const scrapeKillersAndSaveToDatabase = async () => {
         : undefined,
     }));
 
-  // await savePerks(enrich(killerPerks));
+  await savePerks(enrich(killerPerks));
 };

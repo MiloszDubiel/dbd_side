@@ -2,7 +2,11 @@ import express from "express";
 import mysql from "mysql2/promise";
 import cors from "cors";
 import { scrapeSurvivorsAndSaveToDatabase } from "./scrapers/characters";
-import { scrapeKillersAndSaveToDatabase } from "./scrapers/killers";
+import {
+  getKillerAttackType,
+  getKillerReleaseYear,
+  scrapeKillersAndSaveToDatabase,
+} from "./scrapers/killers";
 import { KillerDetails } from "./fetch";
 
 const app = express();
@@ -61,7 +65,7 @@ app.get("/get-selected-killer", async (req, res) => {
     "SELECT * FROM todays_killer INNER JOIN characters ON todays_killer.character_id = characters.id INNER JOIN killer_detail ON characters.id = killer_detail.character_id",
   );
 
-  return res.json({ killer: rows });
+  return res.json({ killers: rows });
 });
 
 async function updateTodaysKiller() {
@@ -136,9 +140,11 @@ async function createNewTodaysKiller(previousId?: number) {
   console.log("Nowy killer dnia:", killerId);
 }
 
-// (async () => {
-//   await updateTodaysKiller();
-// })();
+(async () => {
+  await updateTodaysKiller();
+})();
+
+
 
 app.listen(5000, () => {
   console.log("Server działa na http://localhost:5000");

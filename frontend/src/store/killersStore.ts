@@ -9,11 +9,13 @@ export type Killers = {
   gender: string;
   power_attack_type: string;
   movement_speed: string;
-  alternative_movement_speed: string | null;
+  alternate_movement_speed: string | null;
   terror_radius: string;
   height: string;
   image_url: string;
+  origin: string;
   result: any;
+  selectedKiller?: any;
 };
 
 export type KillersArray = {
@@ -28,7 +30,7 @@ export const fetchKillers = async (): Promise<KillersArray> => {
   return res.data;
 };
 
-export const fetchSelectedKiller = async (): Promise<Killers[]> => {
+export const fetchSelectedKiller = async (): Promise<KillersArray> => {
   const res = await axios.get("http://localhost:5000/get-selected-killer");
 
   if (!res.data) throw new Error("Failed to fetch killers");

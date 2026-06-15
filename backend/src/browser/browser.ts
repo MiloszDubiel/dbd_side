@@ -15,7 +15,6 @@ export async function createBrowser() {
 
   const page = await context.newPage();
 
- 
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "webdriver", {
       get: () => undefined,
@@ -24,7 +23,3 @@ export async function createBrowser() {
 
   return { browser, context, page };
 }
-
-
-
-
