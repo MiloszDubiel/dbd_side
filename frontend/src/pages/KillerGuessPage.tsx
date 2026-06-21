@@ -18,6 +18,7 @@ const columns = {
   Origin: "origin",
   "Release Date": "release_date",
 };
+
 const getValue = (
   col: string,
   guess: Killers,
@@ -28,17 +29,42 @@ const getValue = (
     const movementSpeed = guess.movement_speed?.split(" ");
     const alterante = guess.alternate_movement_speed?.split(" ") || [];
 
-    return [...movementSpeed, ...alterante].join(" ");
+    const defualtMvnts = ["4.6m/s", "4.4m/s", "4.2m/s", "3.85m/s"];
+
+    return [...movementSpeed, ...alterante]
+      .filter((el) => defualtMvnts.includes(el))
+      .join(" ");
   }
 
   for (const [k, v] of keysWithValues) {
     if (k === "in_game_name") continue;
 
     if (k.includes(col.toLowerCase())) {
-      return v as string;
+      console.log(...new Set(v.split(" ")));
+
+      const values = [...new Set(v.split(" "))].join(" ");
+      return values as string;
     }
   }
 };
+const getAttackTypeColor = (selectedType: string, guessType: string) => {
+  if (selectedType === guessType) {
+    return "bg-green-600";
+  }
+
+  const isClose =
+    (selectedType === "Hybrid" && guessType === "Basic Attack") ||
+    (selectedType === "Basic Attack" && guessType === "Hybrid") ||
+    (selectedType === "Hybrid" && guessType === "Hybrid") ||
+    (selectedType === "Ranged" && guessType === "Hybrid");
+
+  if (isClose) {
+    return "bg-yellow-500";
+  }
+
+  return "bg-red-600";
+};
+
 const getCellColor = (
   key: keyof Killers,
   selected: Killers[],
@@ -74,27 +100,36 @@ const getCellColor = (
   if (terr.length === terrGuess.length && key === "terror_radius")
     return selected[0]["terror_radius"] === guess["terror_radius"]
       ? "bg-green-600"
-      : "bg-zinc-600";
+      : "bg-red-600";
 
-  if (terrGuess.includes(terr[0]) && key === "terror_radius") {
+  if (terr.includes(terrGuess[0]) && key === "terror_radius") {
     return "bg-yellow-500";
   }
 
   if (!altMvtGuess.length)
     return selected[0]["movement_speed"] === guess["movement_speed"]
       ? "bg-green-600"
-      : "bg-zinc-600";
+      : "bg-red-600";
 
   if (altMvtGuess.length > 1 && key === "movement_speed") {
     const checks = altMvt.some((v, i) => [...altMvtGuess][i] === v);
     if (checks) return "bg-yellow-500";
   }
 
-  return selected[0][key] === guess[key] ? "bg-green-600" : "bg-zinc-600";
+  if (key === "attack_type") {
+    return getAttackTypeColor(
+      selected[0].power_attack_type as string,
+      guess.power_attack_type as string,
+    );
+  }
+
+  return selected[0][key] === guess[key] ? "bg-green-600" : "bg-red-600";
 };
 
 export default function KillerGuessPage() {
   const [guesses, setGuesses] = useState<Killers[]>([]);
+  const [succes, setSucces] = useState<boolean>(false);
+  const [unlock, setUnlock] = useState<boolean>(true);
 
   const search = useUIStore((s) => s.search);
   const setSearch = useUIStore((s) => s.setSearch);
@@ -108,6 +143,8 @@ export default function KillerGuessPage() {
     queryKey: ["selected-killer"],
     queryFn: fetchSelectedKiller,
   });
+
+  console.log(selectedKiller?.killers[0], guesses);
 
   const filteredKillers =
     killers?.killers?.filter((killer) => {
@@ -125,7 +162,6 @@ export default function KillerGuessPage() {
       const isAlreadyInState = prev.some((el) => el.id === killer.id);
 
       if (isAlreadyInState) return prev;
-
       return [...prev, killer];
     });
   };
@@ -138,12 +174,14 @@ export default function KillerGuessPage() {
         </h1>
 
         <form className="mb-6 flex flex-col items-center relative">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Guess a killer..."
-            className="w-full p-4 rounded-xl bg-zinc-800 border border-zinc-600 focus:outline-none text-lg"
-          />
+          {unlock && (
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Guess a killer..."
+              className="w-full p-4 rounded-xl bg-zinc-800 border border-zinc-600 focus:outline-none text-lg"
+            />
+          )}
           {search.length > 0 && filteredKillers.length > 0 && (
             <div className="mt-2 z-10 bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden shadow-xl w-1/2 flex flex-col items-center max-h-75 h-auto overflow-y-auto absolute top-16">
               {filteredKillers.map((killer: Killers) => (
@@ -185,30 +223,58 @@ export default function KillerGuessPage() {
           {guesses.map((guess, rowIndex) => (
             <div
               key={rowIndex}
-              className="grid grid-cols-8  place-items-center "
+              className="grid grid-cols-8  place-items-center"
             >
-              {Object.entries(columns).map(([c, v], cellIndex) => (
-                <div
-                  key={v}
-                  style={{
-                    animationDelay: `${cellIndex * 400}ms`,
-                    backgroundImage:
-                      c === "Killer" ? `url("${guess.image_url}")` : undefined,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                    backgroundRepeat: "no-repeat",
-                  }}
-                  className={`w-16 h-16 flex items-center justify-center rounded-md border text-xs font-semibold text-center opacity-0 animate-flip-in
+              {Object.entries(columns).map(([c, v], cellIndex) => {
+                if (cellIndex === 0) {
+                  setUnlock(false);
+                } else if (
+                  cellIndex === 6 &&
+                  guess.id !== selectedKiller?.killers[0].id
+                ) {
+                  setTimeout(() => {
+                    setUnlock(true);
+                  }, 7 * 460);
+                } else if (guess.id === selectedKiller?.killers[0].id) {
+                  setTimeout(() => {
+                    setSucces(true);
+                  }, 7 * 460);
+                }
+                return (
+                  <div
+                    key={v}
+                    style={{
+                      animationDelay: `${cellIndex * 400}ms`,
+                      backgroundImage:
+                        c === "Killer"
+                          ? `url("${guess.image_url}")`
+                          : undefined,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      backgroundRepeat: "no-repeat",
+                    }}
+                    className={`w-16 h-16 flex items-center justify-center rounded-md border-gray-700 border text-xs font-semibold text-center opacity-0 animate-flip-in 
             ${getCellColor(
               v as keyof Killers,
               selectedKiller?.killers as Killers[],
               guess,
             )}
           `}
-                >
-                  {getValue(v, guess)}
-                </div>
-              ))}
+                  >
+                    {getValue(v, guess)}
+                    {v === "release_date" &&
+                      guess.release_date !==
+                        selectedKiller?.killers?.[0].release_date && (
+                        <span className="flex justify-center items-center text-white text-4xl">
+                          {Number(guess.release_date) <
+                          Number(selectedKiller?.killers?.[0].release_date)
+                            ? "↑"
+                            : "↓"}
+                        </span>
+                      )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -221,9 +287,24 @@ export default function KillerGuessPage() {
             <div className="w-4 h-4 bg-yellow-500 rounded" /> Close
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-zinc-700 rounded" /> Far
+            <div className="w-4 h-4 bg-red-600 rounded" /> Far
           </div>
         </div>
+        {succes && (
+          <div className="flex flex-col items-center justify-center mt-8">
+            <div className="relative">
+              <img
+                src={selectedKiller?.killers[0].image_url}
+                alt={selectedKiller?.killers[0].in_game_name}
+                className="h-60 rounded-xl border-2 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.5)]"
+              />
+
+              <p className="text-xl font-bold text-green-400 tracking-wide text-center">
+                {selectedKiller?.killers[0].in_game_name}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

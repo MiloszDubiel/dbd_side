@@ -146,8 +146,6 @@ export async function scrapeKillerDetails(
           .$eval(".valueColumn", (el) => el?.textContent?.trim())
           .catch(() => "");
 
-        if (label === "Attack") value = value?.split("\n")[0].trim();
-
         if (label === "Movement Speed") {
           const mainMatch = value?.match(/\d+(?:\.\d+)?/g) || [];
 

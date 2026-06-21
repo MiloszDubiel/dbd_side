@@ -7,7 +7,7 @@ export type Killers = {
   name: string;
   game_aliases: string | null;
   gender: string;
-  power_attack_type: string;
+  attack_type?: string | undefined;
   movement_speed: string;
   alternate_movement_speed: string | null;
   terror_radius: string;
@@ -16,6 +16,8 @@ export type Killers = {
   origin: string;
   result: any;
   selectedKiller?: any;
+  release_date: string;
+  power_attack_type?: string | undefined;
 };
 
 export type KillersArray = {
